@@ -1,9 +1,9 @@
 package org.xbib.netty.http.client.listener;
 
-import io.netty.handler.codec.http.FullHttpResponse;
+import org.jboss.netty.handler.codec.http.HttpResponse;
 
 @FunctionalInterface
 public interface ResponseListener {
 
-    void onResponse(FullHttpResponse fullHttpResponse);
+    void onResponse(HttpResponse httpResponse);
 }

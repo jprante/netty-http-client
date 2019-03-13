@@ -1,18 +1,8 @@
 package org.xbib.netty.http.client.handler.http;
 
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
-import io.netty.handler.codec.http.HttpClientCodec;
-import io.netty.handler.codec.http.HttpContentDecompressor;
-import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.ssl.ApplicationProtocolNames;
-import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
-import io.netty.handler.ssl.SslHandler;
+import org.jboss.netty.channel.Channel;
+import org.jboss.netty.handler.ssl.SslHandler;
 import org.xbib.netty.http.client.ClientConfig;
-import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;
 import org.xbib.netty.http.common.HttpAddress;
 
 import java.util.logging.Level;
@@ -30,16 +20,12 @@ public class HttpChannelInitializer extends ChannelInitializer<Channel> {
 
     private final HttpResponseHandler httpResponseHandler;
 
-    private final Http2ChannelInitializer http2ChannelInitializer;
-
     public HttpChannelInitializer(ClientConfig clientConfig,
                                   HttpAddress httpAddress,
-                                  SslHandler sslHandler,
-                                  Http2ChannelInitializer http2ChannelInitializer) {
+                                  SslHandler sslHandler) {
         this.clientConfig = clientConfig;
         this.httpAddress = httpAddress;
         this.sslHandler = sslHandler;
-        this.http2ChannelInitializer = http2ChannelInitializer;
         this.httpResponseHandler = new HttpResponseHandler();
     }
 

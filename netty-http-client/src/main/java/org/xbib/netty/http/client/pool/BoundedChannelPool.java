@@ -1,16 +1,11 @@
 package org.xbib.netty.http.client.pool;
 
-import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPromise;
-import io.netty.channel.pool.ChannelPoolHandler;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame;
-import io.netty.util.AttributeKey;
+import org.jboss.netty.bootstrap.Bootstrap;
+import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelFuture;
+import org.jboss.netty.channel.ChannelFutureListener;
+import org.jboss.netty.channel.socket.SocketChannel;
+import org.jboss.netty.handler.codec.http.HttpVersion;
 import org.xbib.netty.http.common.PoolKey;
 
 import java.io.IOException;
@@ -105,7 +100,7 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
         failedCounts = new ConcurrentHashMap<>(numberOfNodes);
         for (K node : nodes) {
             ChannelPoolInitializer initializer = new ChannelPoolInitializer(node, channelPoolHandler);
-            bootstraps.put(node, bootstrap.clone().remoteAddress(node.getInetSocketAddress())
+            bootstraps.put(node, bootstrap/*.clone()*/.remoteAddress(node.getInetSocketAddress())
                 .handler(initializer));
             availableChannels.put(node, new ConcurrentLinkedQueue<>());
             counts.put(node, 0);
@@ -202,20 +197,6 @@ public class BoundedChannelPool<K extends PoolKey> implements Pool<Channel> {
             for (Channel channel : channelSet) {
                 if (channel != null && channel.isOpen()) {
                     logger.log(Level.FINE, "trying to abort channel " + channel);
-                    if (httpVersion.majorVersion() == 2) {
-                        // be polite, send a go away frame
-                        DefaultHttp2GoAwayFrame goAwayFrame = new DefaultHttp2GoAwayFrame(0);
-                        ChannelPromise channelPromise = channel.newPromise();
-                        channel.writeAndFlush(goAwayFrame, channelPromise);
-                        try {
-                            channelPromise.get();
-                            logger.log(Level.FINE, "goaway frame sent to " + channel);
-                        } catch (ExecutionException e) {
-                            // ignore error if goaway can not be sent
-                        } catch (InterruptedException e) {
-                            throw new IOException(e);
-                        }
-                    }
                     channel.close();
                     count++;
                 }

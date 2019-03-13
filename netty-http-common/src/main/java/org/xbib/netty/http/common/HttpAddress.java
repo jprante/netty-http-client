@@ -1,6 +1,6 @@
 package org.xbib.netty.http.common;
 
-import io.netty.handler.codec.http.HttpVersion;
+import org.jboss.netty.handler.codec.http.HttpVersion;
 import org.xbib.net.URL;
 
 import java.net.InetSocketAddress;

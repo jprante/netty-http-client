@@ -1,26 +1,16 @@
 package org.xbib.netty.http.client;
 
-import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.EpollSocketChannel;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.pool.ChannelPoolHandler;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
-import io.netty.handler.ssl.ApplicationProtocolConfig;
-import io.netty.handler.ssl.ApplicationProtocolNames;
-import io.netty.handler.ssl.OpenSsl;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SslHandler;
+import org.jboss.netty.bootstrap.Bootstrap;
+import org.jboss.netty.bootstrap.ClientBootstrap;
+import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelConfig;
+import org.jboss.netty.channel.ChannelFactory;
+import org.jboss.netty.channel.socket.SocketChannel;
+import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
+import org.jboss.netty.channel.socket.nio.NioSocketChannel;
+import org.jboss.netty.handler.codec.http.HttpVersion;
+import org.jboss.netty.handler.ssl.OpenSsl;
+import org.jboss.netty.handler.ssl.SslHandler;
 import org.xbib.netty.http.client.handler.http.HttpChannelInitializer;
 import org.xbib.netty.http.client.handler.http2.Http2ChannelInitializer;
 import org.xbib.netty.http.client.pool.BoundedChannelPool;
@@ -73,13 +63,7 @@ public final class Client {
 
     private final ClientConfig clientConfig;
 
-    private final ByteBufAllocator byteBufAllocator;
-
-    private final EventLoopGroup eventLoopGroup;
-
-    private final Class<? extends SocketChannel> socketChannelClass;
-
-    private final Bootstrap bootstrap;
+    private final ClientBootstrap bootstrap;
 
     private final List<Transport> transports;
 
@@ -90,32 +74,16 @@ public final class Client {
     }
 
     public Client(ClientConfig clientConfig) {
-        this(clientConfig, null, null, null);
-    }
-
-    public Client(ClientConfig clientConfig, ByteBufAllocator byteBufAllocator,
-                  EventLoopGroup eventLoopGroup, Class<? extends SocketChannel> socketChannelClass) {
         Objects.requireNonNull(clientConfig);
         this.clientConfig = clientConfig;
         initializeTrustManagerFactory(clientConfig);
-        this.byteBufAllocator = byteBufAllocator != null ?
-                byteBufAllocator : ByteBufAllocator.DEFAULT;
-        this.eventLoopGroup = eventLoopGroup != null ? eventLoopGroup : clientConfig.isEpoll() ?
-                    new EpollEventLoopGroup(clientConfig.getThreadCount(), httpClientThreadFactory) :
-                    new NioEventLoopGroup(clientConfig.getThreadCount(), httpClientThreadFactory);
-        this.socketChannelClass = socketChannelClass != null ? socketChannelClass : clientConfig.isEpoll() ?
-                EpollSocketChannel.class : NioSocketChannel.class;
-        this.bootstrap = new Bootstrap()
-                .group(this.eventLoopGroup)
-                .channel(this.socketChannelClass)
-                .option(ChannelOption.ALLOCATOR, byteBufAllocator)
-                .option(ChannelOption.TCP_NODELAY, clientConfig.isTcpNodelay())
-                .option(ChannelOption.SO_KEEPALIVE, clientConfig.isKeepAlive())
-                .option(ChannelOption.SO_REUSEADDR, clientConfig.isReuseAddr())
-                .option(ChannelOption.SO_SNDBUF, clientConfig.getTcpSendBufferSize())
-                .option(ChannelOption.SO_RCVBUF, clientConfig.getTcpReceiveBufferSize())
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, clientConfig.getConnectTimeoutMillis())
-                .option(ChannelOption.WRITE_BUFFER_WATER_MARK, clientConfig.getWriteBufferWaterMark());
+        ChannelFactory channelFactory = new NioClientSocketChannelFactory();
+        this.bootstrap = new ClientBootstrap(channelFactory);
+        bootstrap.setOption("tcpNoDelay", clientConfig.isTcpNodelay());
+        bootstrap.setOption("keepAlive", clientConfig.isKeepAlive());
+        bootstrap.setOption("reuseAddr", clientConfig.isReuseAddr());
+        bootstrap.setOption("sendBufferSize", clientConfig.getTcpSendBufferSize());
+        bootstrap.setOption("receiveBufferSize", clientConfig.getTcpReceiveBufferSize());
         this.transports = new CopyOnWriteArrayList<>();
         if (!clientConfig.getPoolNodes().isEmpty()) {
             List<HttpAddress> nodes = clientConfig.getPoolNodes();
@@ -152,21 +120,13 @@ public final class Client {
         return clientConfig;
     }
 
-    public ByteBufAllocator getByteBufAllocator() {
-        return byteBufAllocator;
-    }
-
     public boolean hasPooledConnections() {
         return pool != null && !clientConfig.getPoolNodes().isEmpty();
     }
 
     public void logDiagnostics(Level level) {
         logger.log(level, () -> "OpenSSL available: " + OpenSsl.isAvailable() +
-                " OpenSSL ALPN support: " + OpenSsl.isAlpnSupported() +
-                " Local host name: " + NetworkUtils.getLocalHostName("localhost") +
-                " event loop group: " + eventLoopGroup +
-                " socket: " + socketChannelClass.getName() +
-                " allocator: " + byteBufAllocator.getClass().getName());
+                " Local host name: " + NetworkUtils.getLocalHostName("localhost"));
         logger.log(level, NetworkUtils::displayNetworkInterfaces);
     }
 
@@ -201,7 +161,7 @@ public final class Client {
             HttpVersion httpVersion = httpAddress.getVersion();
             ChannelInitializer<Channel> initializer;
             SslHandler sslHandler = newSslHandler(clientConfig, byteBufAllocator, httpAddress);
-            if (httpVersion.majorVersion() == 1) {
+            if (httpVersion.getMajorVersion() == 1) {
                 initializer = new HttpChannelInitializer(clientConfig, httpAddress, sslHandler,
                         new Http2ChannelInitializer(clientConfig, httpAddress, sslHandler));
             } else {

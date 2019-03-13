@@ -1,8 +1,9 @@
 package org.xbib.netty.http.client.rest;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpMethod;
+import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.buffer.ChannelBuffers;
+import org.jboss.netty.handler.codec.http.HttpMethod;
+import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.xbib.net.URL;
 import org.xbib.netty.http.client.Client;
 import org.xbib.netty.http.common.HttpAddress;
@@ -17,16 +18,16 @@ public class RestClient {
 
     private static final Client client = new Client();
 
-    private FullHttpResponse response;
+    private HttpResponse response;
 
     private RestClient() {
     }
 
-    public void setResponse(FullHttpResponse response) {
-        this.response = response.copy();
+    public void setResponse(HttpResponse response) {
+        this.response = response;
     }
 
-    public FullHttpResponse getResponse() {
+    public HttpResponse getResponse() {
         return response;
     }
 
@@ -35,14 +36,8 @@ public class RestClient {
     }
 
     public String asString(Charset charset) {
-        ByteBuf byteBuf = response != null ? response.content() : null;
-        try {
-            return byteBuf != null && byteBuf.isReadable() ? response.content().toString(charset) : null;
-        } finally {
-            if (byteBuf != null) {
-                byteBuf.release();
-            }
-        }
+        ChannelBuffer byteBuf = response != null ? response.getContent() : null;
+        return byteBuf != null && byteBuf.readable() ? response.getContent().toString(charset) : null;
     }
 
     public void close() throws IOException {
@@ -61,7 +56,7 @@ public class RestClient {
         return method(urlString, body, StandardCharsets.UTF_8, HttpMethod.POST);
     }
 
-    public static RestClient post(String urlString, ByteBuf content) throws IOException {
+    public static RestClient post(String urlString, ChannelBuffer content) throws IOException {
         return method(urlString, content, HttpMethod.POST);
     }
 
@@ -69,23 +64,22 @@ public class RestClient {
         return method(urlString, body, StandardCharsets.UTF_8, HttpMethod.PUT);
     }
 
-    public static RestClient put(String urlString, ByteBuf content) throws IOException {
+    public static RestClient put(String urlString, ChannelBuffer content) throws IOException {
         return method(urlString, content, HttpMethod.PUT);
     }
 
     public static RestClient method(String urlString,
                                     String body, Charset charset,
                                     HttpMethod httpMethod) throws IOException {
-        ByteBuf byteBuf = null;
+        ChannelBuffer byteBuf = null;
         if (body != null && charset != null) {
-            byteBuf = client.getByteBufAllocator().buffer();
-            byteBuf.writeCharSequence(body, charset);
+            byteBuf = ChannelBuffers.copiedBuffer(body, charset);
         }
         return method(urlString, byteBuf, httpMethod);
     }
 
     public static RestClient method(String urlString,
-                                    ByteBuf byteBuf,
+                                    ChannelBuffer byteBuf,
                                     HttpMethod httpMethod) throws IOException {
         URL url = URL.create(urlString);
         RestClient restClient = new RestClient();
